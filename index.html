@@ -59,6 +59,19 @@
             </div>
         </header>
 
+        <!-- Filters Section -->
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-2">
+                <i data-lucide="filter" class="w-5 h-5 text-indigo-600"></i>
+                <span class="font-semibold text-slate-700">Filtrar por Loja</span>
+            </div>
+            <div class="flex items-center gap-3 w-full sm:w-auto">
+                <select id="filter-store" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 pr-8 min-w-[220px] outline-none transition-all cursor-pointer">
+                    <option value="all">Todas as Lojas</option>
+                </select>
+            </div>
+        </div>
+
         <!-- Kpi Cards -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <!-- Card 1 -->
@@ -137,6 +150,17 @@
             </div>
         </div>
 
+        <!-- Unified Store Chart Section -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-slate-800">Valor Total Consignado por Loja</h3>
+                <p class="text-xs text-slate-500">Valores consolidados por estabelecimento</p>
+            </div>
+            <div class="relative h-[450px]">
+                <canvas id="chartLoja"></canvas>
+            </div>
+        </div>
+
         <!-- Table Section -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             <div class="p-6 border-b border-slate-100 flex justify-between items-center">
@@ -167,6 +191,11 @@
 
     <!-- Lógica JavaScript do Dashboard -->
     <script>
+        // Instâncias dos gráficos
+        let chartValorInst = null;
+        let chartVolumeInst = null;
+        let chartLojaInst = null;
+
         // Inicializa ícones Lucide
         lucide.createIcons();
 
@@ -174,8 +203,22 @@
         const formatBRL = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
         const formatNum = (value) => new Intl.NumberFormat('pt-BR').format(value);
 
+        // Função para formatar o nome da loja para Title Case
+        const formatStoreName = (name) => {
+            if (!name) return "";
+            // Corrige ortografia comum e remove espaços extras
+            let cleaned = name.trim()
+                .replace(/\s+/g, ' ')
+                .replace(/AUTOMOVÉIS/gi, 'Automóveis')
+                .replace(/veiculos/gi, 'Veículos')
+                .replace(/automoveis/gi, 'Automóveis');
+            
+            // Capitaliza cada palavra
+            return cleaned.toLowerCase().replace(/(?:^|\s)\S/g, l => l.toUpperCase());
+        };
+
         // Dados baseados na extração
-        const data = [
+        const rawData = [
             { name: "Kariny Lucy", store: "TOP MULTIMARCAS", cars: 4, value: 253600.00 },
             { name: "Gislayne", store: "Infinity veiculos", cars: 3, value: 267000.00 },
             { name: "Izabella", store: "Legacy Veiculos", cars: 14, value: 908222.00 },
@@ -212,120 +255,236 @@
             { name: "Ana Livia", store: "titanium veiculos", cars: 8, value: 725909.46 }
         ];
 
-        // Processamento de KPIs
-        const totalCarros = data.reduce((acc, curr) => acc + curr.cars, 0);
-        const valorTotal = data.reduce((acc, curr) => acc + curr.value, 0);
-        const ticketMedio = valorTotal / totalCarros;
-        // Total de consignadoras reais (A equipe montana conta como 3)
-        const totalConsignadoras = 36; 
+        // Processamento inicial dos dados com a formatação padronizada
+        const data = rawData.map(item => ({
+            ...item,
+            store: formatStoreName(item.store)
+        }));
 
-        // Atualiza a UI
-        document.getElementById('kpi-valor').innerText = formatBRL(valorTotal);
-        document.getElementById('kpi-carros').innerText = formatNum(totalCarros);
-        document.getElementById('kpi-consignadoras').innerText = totalConsignadoras;
-        document.getElementById('kpi-ticket').innerText = formatBRL(ticketMedio);
-
-        // Preencher Tabela (Ordenada por valor decrescente)
-        const tbody = document.getElementById('table-body');
-        const sortedData = [...data].sort((a, b) => b.value - a.value);
-
-        sortedData.forEach(item => {
-            const tr = document.createElement('tr');
-            tr.className = "hover:bg-slate-50 transition-colors";
-            
-            const rowTicket = item.value / item.cars;
-
-            tr.innerHTML = `
-                <td class="p-4 font-medium text-slate-800">${item.name}</td>
-                <td class="p-4 text-slate-600">${item.store}</td>
-                <td class="p-4 text-center">
-                    <span class="inline-flex items-center justify-center bg-slate-100 text-slate-700 font-semibold px-2.5 py-0.5 rounded-full">
-                        ${item.cars}
-                    </span>
-                </td>
-                <td class="p-4 text-right font-medium text-emerald-600">${formatBRL(item.value)}</td>
-                <td class="p-4 text-right text-slate-500 text-xs">${formatBRL(rowTicket)}</td>
-            `;
-            tbody.appendChild(tr);
+        // Adiciona o novo registro (extraído do print da calculadora: R$ 7.829.952,00)
+        data.push({
+            name: "Não Informado",
+            store: "Não Informada",
+            cars: 0,
+            value: 7829952.00
         });
 
-        // Configuração Comum dos Gráficos
-        Chart.defaults.font.family = "'Inter', sans-serif";
-        Chart.defaults.color = '#64748b';
+        // Popular o Select de Lojas dinamicamente
+        const filterStoreSelect = document.getElementById('filter-store');
+        const uniqueStores = [...new Set(data.map(item => item.store))].sort((a, b) => {
+            if (a === "Não Informada") return 1;
+            if (b === "Não Informada") return -1;
+            return a.localeCompare(b);
+        });
 
-        // Gráfico 1: Top 5 por Valor
-        const top5Valor = [...data].sort((a, b) => b.value - a.value).slice(0, 5);
-        const ctxValor = document.getElementById('chartValor').getContext('2d');
-        new Chart(ctxValor, {
-            type: 'bar',
-            data: {
-                labels: top5Valor.map(d => d.name.split(' ')[0]), // Primeiro nome para caber
-                datasets: [{
-                    label: 'Valor Consignado (R$)',
-                    data: top5Valor.map(d => d.value),
-                    backgroundColor: '#10b981', // Emerald 500
-                    borderRadius: 6,
-                    barThickness: 30
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return formatBRL(context.raw);
+        uniqueStores.forEach(store => {
+            const option = document.createElement('option');
+            option.value = store;
+            option.innerText = store;
+            filterStoreSelect.appendChild(option);
+        });
+
+        // Função de atualização dinâmica do dashboard
+        function updateDashboard() {
+            const selectedStore = filterStoreSelect.value;
+            
+            // Filtra os dados com base na loja selecionada
+            const filteredData = selectedStore === 'all' 
+                ? data 
+                : data.filter(item => item.store === selectedStore);
+
+            // Processamento dos KPIs
+            const totalCarros = filteredData.reduce((acc, curr) => acc + curr.cars, 0);
+            const valorTotal = filteredData.reduce((acc, curr) => acc + curr.value, 0);
+            const ticketMedio = totalCarros > 0 ? valorTotal / totalCarros : 0;
+            
+            // Total de consignadoras distintas filtradas (ou total de itens se for o caso)
+            const totalConsignadoras = new Set(filteredData.map(item => item.name)).size;
+
+            // Atualiza os valores na UI
+            document.getElementById('kpi-valor').innerText = formatBRL(valorTotal);
+            document.getElementById('kpi-carros').innerText = formatNum(totalCarros);
+            document.getElementById('kpi-consignadoras').innerText = totalConsignadoras;
+            document.getElementById('kpi-ticket').innerText = totalCarros > 0 ? formatBRL(ticketMedio) : "R$ 0,00";
+
+            // Preenche a Tabela (Ordenada por valor decrescente)
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = '';
+            
+            const sortedData = [...filteredData].sort((a, b) => b.value - a.value);
+
+            sortedData.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition-colors";
+                
+                const rowTicket = item.cars > 0 ? item.value / item.cars : 0;
+
+                tr.innerHTML = `
+                    <td class="p-4 font-medium text-slate-800">${item.name}</td>
+                    <td class="p-4 text-slate-600">${item.store}</td>
+                    <td class="p-4 text-center">
+                        <span class="inline-flex items-center justify-center bg-slate-100 text-slate-700 font-semibold px-2.5 py-0.5 rounded-full">
+                            ${item.cars}
+                        </span>
+                    </td>
+                    <td class="p-4 text-right font-medium text-emerald-600">${formatBRL(item.value)}</td>
+                    <td class="p-4 text-right text-slate-500 text-xs">${item.cars > 0 ? formatBRL(rowTicket) : '-'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Configuração Comum dos Gráficos
+            Chart.defaults.font.family = "'Inter', sans-serif";
+            Chart.defaults.color = '#64748b';
+
+            // 1. Gráfico de Maiores Valores (Top 5)
+            const top5Valor = [...filteredData].sort((a, b) => b.value - a.value).slice(0, 5);
+            
+            if (chartValorInst) chartValorInst.destroy();
+            const ctxValor = document.getElementById('chartValor').getContext('2d');
+            chartValorInst = new Chart(ctxValor, {
+                type: 'bar',
+                data: {
+                    labels: top5Valor.map(d => d.name.split(' ')[0]),
+                    datasets: [{
+                        label: 'Valor Consignado (R$)',
+                        data: top5Valor.map(d => d.value),
+                        backgroundColor: '#10b981', // Emerald 500
+                        borderRadius: 6,
+                        barThickness: 24
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) { return formatBRL(context.raw); }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { borderDash: [4, 4], color: '#f1f5f9' },
+                            ticks: {
+                                callback: function(value) {
+                                    if (value >= 1000000) return 'R$ ' + (value/1000000).toFixed(1) + 'M';
+                                    if (value >= 1000) return 'R$ ' + (value/1000).toFixed(0) + 'k';
+                                    return 'R$ ' + value;
+                                }
+                            }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // 2. Gráfico de Volumes de Carros (Top 5)
+            // Filtra os itens com cars > 0
+            const volumeData = [...filteredData].filter(d => d.cars > 0).sort((a, b) => b.cars - a.cars).slice(0, 5);
+            
+            if (chartVolumeInst) chartVolumeInst.destroy();
+            
+            const ctxVolume = document.getElementById('chartVolume').getContext('2d');
+            chartVolumeInst = new Chart(ctxVolume, {
+                type: 'bar',
+                data: {
+                    labels: volumeData.length > 0 ? volumeData.map(d => d.name.split(' ')[0]) : ['Nenhum'],
+                    datasets: [{
+                        label: 'Qtd. de Carros',
+                        data: volumeData.length > 0 ? volumeData.map(d => d.cars) : [0],
+                        backgroundColor: '#3b82f6', // Blue 500
+                        borderRadius: 6,
+                        barThickness: 24
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { borderDash: [4, 4], color: '#f1f5f9' },
+                            ticks: { stepSize: 5 }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // 3. Novo Gráfico: Valor Unificado por Loja
+            // Agrupar os valores por loja
+            const valuesByStore = {};
+            filteredData.forEach(item => {
+                valuesByStore[item.store] = (valuesByStore[item.store] || 0) + item.value;
+            });
+
+            // Converter para formato de lista e ordenar por valor
+            const storeList = Object.keys(valuesByStore).map(store => ({
+                store: store,
+                value: valuesByStore[store]
+            })).sort((a, b) => b.value - a.value);
+
+            if (chartLojaInst) chartLojaInst.destroy();
+            const ctxLoja = document.getElementById('chartLoja').getContext('2d');
+            chartLojaInst = new Chart(ctxLoja, {
+                type: 'bar',
+                data: {
+                    labels: storeList.map(d => d.store),
+                    datasets: [{
+                        label: 'Valor Total Consignado',
+                        data: storeList.map(d => d.value),
+                        backgroundColor: '#6366f1', // Indigo 500
+                        borderRadius: 4,
+                        barThickness: storeList.length > 5 ? 12 : 28
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', // Define gráfico de barras horizontais
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) { return formatBRL(context.raw); }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            grid: { borderDash: [4, 4], color: '#f1f5f9' },
+                            ticks: {
+                                callback: function(value) {
+                                    if (value >= 1000000) return 'R$ ' + (value/1000000).toFixed(1) + 'M';
+                                    if (value >= 1000) return 'R$ ' + (value/1000).toFixed(0) + 'k';
+                                    return 'R$ ' + value;
+                                }
+                            }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: {
+                                autoSkip: false // Exibe todos os nomes de lojas sem ocultar nenhum
                             }
                         }
                     }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: { borderDash: [4, 4], color: '#f1f5f9' },
-                        ticks: {
-                            callback: function(value) {
-                                return 'R$ ' + (value/1000000).toFixed(1) + 'M';
-                            }
-                        }
-                    },
-                    x: { grid: { display: false } }
                 }
-            }
-        });
+            });
+        }
 
-        // Gráfico 2: Top 5 por Volume de Carros
-        const top5Volume = [...data].sort((a, b) => b.cars - a.cars).slice(0, 5);
-        const ctxVolume = document.getElementById('chartVolume').getContext('2d');
-        new Chart(ctxVolume, {
-            type: 'bar',
-            data: {
-                labels: top5Volume.map(d => d.name.split(' ')[0]),
-                datasets: [{
-                    label: 'Qtd. de Carros',
-                    data: top5Volume.map(d => d.cars),
-                    backgroundColor: '#3b82f6', // Blue 500
-                    borderRadius: 6,
-                    barThickness: 30
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: { borderDash: [4, 4], color: '#f1f5f9' }
-                    },
-                    x: { grid: { display: false } }
-                }
-            }
-        });
+        // Adiciona evento de escuta para o filtro
+        filterStoreSelect.addEventListener('change', updateDashboard);
+
+        // Inicializa o dashboard no carregamento da página
+        updateDashboard();
     </script>
 </body>
 </html>
