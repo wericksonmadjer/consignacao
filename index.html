@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Consignações</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+
+        /* Custom Scrollbar para a tabela */
+        .table-container::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        .table-container::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+            border-radius: 4px;
+        }
+        .table-container::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        .table-container::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                    <i data-lucide="layout-dashboard" class="text-indigo-600"></i>
+                    Painel de Consignações
+                </h1>
+                <p class="text-slate-500 text-sm mt-1">Visão geral dos resultados de captação (Maio/2026)</p>
+            </div>
+            <div class="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2">
+                <i data-lucide="calendar" class="w-4 h-4"></i>
+                Atualizado: Junho/2026
+            </div>
+        </header>
+
+        <!-- Kpi Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <!-- Card 1 -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-sm font-medium text-slate-500">Valor Total Consignado</p>
+                        <h3 class="text-2xl font-bold text-slate-900 mt-2" id="kpi-valor">R$ 0,00</h3>
+                    </div>
+                    <div class="p-3 bg-emerald-50 rounded-xl">
+                        <i data-lucide="circle-dollar-sign" class="w-6 h-6 text-emerald-600"></i>
+                    </div>
+                </div>
+                <div class="absolute bottom-0 left-0 w-full h-1 bg-emerald-500 scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-sm font-medium text-slate-500">Total de Carros</p>
+                        <h3 class="text-2xl font-bold text-slate-900 mt-2" id="kpi-carros">0</h3>
+                    </div>
+                    <div class="p-3 bg-blue-50 rounded-xl">
+                        <i data-lucide="car" class="w-6 h-6 text-blue-600"></i>
+                    </div>
+                </div>
+                <div class="absolute bottom-0 left-0 w-full h-1 bg-blue-500 scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-sm font-medium text-slate-500">Consignadoras</p>
+                        <h3 class="text-2xl font-bold text-slate-900 mt-2" id="kpi-consignadoras">0</h3>
+                    </div>
+                    <div class="p-3 bg-purple-50 rounded-xl">
+                        <i data-lucide="users" class="w-6 h-6 text-purple-600"></i>
+                    </div>
+                </div>
+                <div class="absolute bottom-0 left-0 w-full h-1 bg-purple-500 scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-sm font-medium text-slate-500">Ticket Médio p/ Carro</p>
+                        <h3 class="text-2xl font-bold text-slate-900 mt-2" id="kpi-ticket">R$ 0,00</h3>
+                    </div>
+                    <div class="p-3 bg-orange-50 rounded-xl">
+                        <i data-lucide="trending-up" class="w-6 h-6 text-orange-600"></i>
+                    </div>
+                </div>
+                <div class="absolute bottom-0 left-0 w-full h-1 bg-orange-500 scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Gráfico Valor -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Top 5 - Maiores Valores Consignados</h3>
+                <div class="relative h-64">
+                    <canvas id="chartValor"></canvas>
+                </div>
+            </div>
+            
+            <!-- Gráfico Volume -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Top 5 - Maior Volume de Carros</h3>
+                <div class="relative h-64">
+                    <canvas id="chartVolume"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table Section -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-slate-800">Detalhamento por Consignadora</h3>
+                <button onclick="window.print()" class="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors">
+                    <i data-lucide="printer" class="w-4 h-4"></i> Imprimir/PDF
+                </button>
+            </div>
+            <div class="overflow-x-auto table-container">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 text-slate-500 text-sm border-b border-slate-200">
+                            <th class="p-4 font-medium">Consignadora</th>
+                            <th class="p-4 font-medium">Loja</th>
+                            <th class="p-4 font-medium text-center">Nº Carros</th>
+                            <th class="p-4 font-medium text-right">Valor Total</th>
+                            <th class="p-4 font-medium text-right">Média/Carro</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body" class="text-sm divide-y divide-slate-100">
+                        <!-- Linhas injetadas via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- Lógica JavaScript do Dashboard -->
+    <script>
+        // Inicializa ícones Lucide
+        lucide.createIcons();
+
+        // Formatadores
+        const formatBRL = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+        const formatNum = (value) => new Intl.NumberFormat('pt-BR').format(value);
+
+        // Dados baseados na extração
+        const data = [
+            { name: "Kariny Lucy", store: "TOP MULTIMARCAS", cars: 4, value: 253600.00 },
+            { name: "Gislayne", store: "Infinity veiculos", cars: 3, value: 267000.00 },
+            { name: "Izabella", store: "Legacy Veiculos", cars: 14, value: 908222.00 },
+            { name: "Lorhayne", store: "Legacy Veiculos", cars: 14, value: 768200.00 },
+            { name: "Heloísa", store: "Lauthan MOTORS", cars: 2, value: 156000.00 },
+            { name: "Inaiê Tomaz", store: "Paulino Automóveis", cars: 6, value: 427800.00 },
+            { name: "Jhenyfer Chaves", store: "DM", cars: 13, value: 452000.00 },
+            { name: "Alexia", store: "Atitude Car", cars: 5, value: 457000.00 },
+            { name: "Nicolly Aysha", store: "CELEBRA VEÍCULOS", cars: 27, value: 2141990.00 },
+            { name: "Maíra", store: "Infinity Veículos", cars: 5, value: 747000.00 },
+            { name: "Elo", store: "Papuun Automóveis", cars: 8, value: 671500.00 },
+            { name: "Emily Stasiak", store: "Auto Poa", cars: 42, value: 2833600.00 },
+            { name: "Isabelle Araujo", store: "Naves Veículos", cars: 41, value: 3654400.00 },
+            { name: "Vanessa Caetano", store: "Celebra Veículos", cars: 23, value: 2182000.00 },
+            { name: "Amanda", store: "Indacar automóveis", cars: 25, value: 1107599.00 },
+            { name: "Natália", store: "HotCar Multimarcas", cars: 18, value: 1310685.00 },
+            { name: "Jussara", store: "Águia Automóveis", cars: 8, value: 411749.00 },
+            { name: "Vitória", store: "f2 car premium", cars: 2, value: 220000.00 },
+            { name: "Deise Costa", store: "CABRAL AUTOMOVÉIS", cars: 13, value: 1643437.00 },
+            { name: "Priscila", store: "Leocar Multimarcas", cars: 15, value: 1184787.00 },
+            { name: "Karina Carvalho", store: "HOTCAR Multimarcas", cars: 21, value: 1515868.00 },
+            { name: "Camila Dias", store: "Autopoa", cars: 15, value: 1224500.00 },
+            { name: "Maria Júlia Muller", store: "Vgcars", cars: 5, value: 380690.00 },
+            { name: "Lavinya", store: "Infinity veiculos", cars: 4, value: 448000.00 },
+            { name: "Lucinéia", store: "Fecar veículos", cars: 1, value: 100000.00 },
+            { name: "Grazi", store: "Cerol Car", cars: 12, value: 1742000.00 },
+            { name: "Carolina", store: "Fox veículos", cars: 10, value: 678300.00 },
+            { name: "Juliane", store: "Saab Multimarcas", cars: 6, value: 462500.00 },
+            { name: "Eq. Montana (Cátia/Silvana/Karen)", store: "Montana Automoveis", cars: 40, value: 849900.00 },
+            { name: "Juliana Mesquita", store: "Soul Faria Veículos", cars: 18, value: 1383400.00 },
+            { name: "Raika Nicole", store: "CRED AUTO", cars: 2, value: 128900.00 },
+            { name: "Bella Araujo", store: "Cred Auto Veiculos", cars: 12, value: 880500.00 },
+            { name: "Dafini Flores", store: "Titanium veículos", cars: 11, value: 907743.00 },
+            { name: "Ana Livia", store: "titanium veiculos", cars: 8, value: 725909.46 }
+        ];
+
+        // Processamento de KPIs
+        const totalCarros = data.reduce((acc, curr) => acc + curr.cars, 0);
+        const valorTotal = data.reduce((acc, curr) => acc + curr.value, 0);
+        const ticketMedio = valorTotal / totalCarros;
+        // Total de consignadoras reais (A equipe montana conta como 3)
+        const totalConsignadoras = 36; 
+
+        // Atualiza a UI
+        document.getElementById('kpi-valor').innerText = formatBRL(valorTotal);
+        document.getElementById('kpi-carros').innerText = formatNum(totalCarros);
+        document.getElementById('kpi-consignadoras').innerText = totalConsignadoras;
+        document.getElementById('kpi-ticket').innerText = formatBRL(ticketMedio);
+
+        // Preencher Tabela (Ordenada por valor decrescente)
+        const tbody = document.getElementById('table-body');
+        const sortedData = [...data].sort((a, b) => b.value - a.value);
+
+        sortedData.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.className = "hover:bg-slate-50 transition-colors";
+            
+            const rowTicket = item.value / item.cars;
+
+            tr.innerHTML = `
+                <td class="p-4 font-medium text-slate-800">${item.name}</td>
+                <td class="p-4 text-slate-600">${item.store}</td>
+                <td class="p-4 text-center">
+                    <span class="inline-flex items-center justify-center bg-slate-100 text-slate-700 font-semibold px-2.5 py-0.5 rounded-full">
+                        ${item.cars}
+                    </span>
+                </td>
+                <td class="p-4 text-right font-medium text-emerald-600">${formatBRL(item.value)}</td>
+                <td class="p-4 text-right text-slate-500 text-xs">${formatBRL(rowTicket)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // Configuração Comum dos Gráficos
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.color = '#64748b';
+
+        // Gráfico 1: Top 5 por Valor
+        const top5Valor = [...data].sort((a, b) => b.value - a.value).slice(0, 5);
+        const ctxValor = document.getElementById('chartValor').getContext('2d');
+        new Chart(ctxValor, {
+            type: 'bar',
+            data: {
+                labels: top5Valor.map(d => d.name.split(' ')[0]), // Primeiro nome para caber
+                datasets: [{
+                    label: 'Valor Consignado (R$)',
+                    data: top5Valor.map(d => d.value),
+                    backgroundColor: '#10b981', // Emerald 500
+                    borderRadius: 6,
+                    barThickness: 30
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return formatBRL(context.raw);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { borderDash: [4, 4], color: '#f1f5f9' },
+                        ticks: {
+                            callback: function(value) {
+                                return 'R$ ' + (value/1000000).toFixed(1) + 'M';
+                            }
+                        }
+                    },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+
+        // Gráfico 2: Top 5 por Volume de Carros
+        const top5Volume = [...data].sort((a, b) => b.cars - a.cars).slice(0, 5);
+        const ctxVolume = document.getElementById('chartVolume').getContext('2d');
+        new Chart(ctxVolume, {
+            type: 'bar',
+            data: {
+                labels: top5Volume.map(d => d.name.split(' ')[0]),
+                datasets: [{
+                    label: 'Qtd. de Carros',
+                    data: top5Volume.map(d => d.cars),
+                    backgroundColor: '#3b82f6', // Blue 500
+                    borderRadius: 6,
+                    barThickness: 30
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { borderDash: [4, 4], color: '#f1f5f9' }
+                    },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
